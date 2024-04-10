@@ -1,8 +1,47 @@
-use nu_plugin::LabeledError;
-use nu_protocol::Value;
+use crate::MsgPackPlugin;
+use nu_plugin::{EngineInterface, EvaluatedCall, SimplePluginCommand};
+use nu_protocol::{Category, LabeledError, Signature, Span, Type, Value};
+
+pub struct IntoMsgpack;
+
+impl SimplePluginCommand for IntoMsgpack {
+    type Plugin = MsgPackPlugin;
+
+    fn name(&self) -> &str {
+        "into msgpack"
+    }
+
+    fn usage(&self) -> &str {
+        "Converts data into msgpack."
+    }
+    fn signature(&self) -> Signature {
+        Signature::build(self.name())
+            .category(Category::Formats)
+            .input_output_type(Type::Any, Type::Table(vec![]))
+    }
+
+    fn search_terms(&self) -> Vec<&str> {
+        vec!["msgpack", "plugins"]
+    }
+
+    fn run(
+        &self,
+        _plugin: &MsgPackPlugin,
+        _engine: &EngineInterface,
+        _call: &EvaluatedCall,
+        input: &Value,
+    ) -> Result<Value, LabeledError> {
+        let msgpack_value = nu_to_rmpv(input.clone())?;
+        let mut encoded = vec![];
+        rmpv::encode::write_value(&mut encoded, &msgpack_value)
+            .expect("encoding to vec can't fail, right?");
+        Ok(Value::binary(encoded, Span::unknown()))
+    }
+}
 
 /// Convert [nu_protocol::Value] to a [rmpv::Value].
 pub fn nu_to_rmpv(value: Value) -> Result<rmpv::Value, LabeledError> {
+    let span = value.span();
     Ok(match value {
         Value::Bool { val, .. } => val.into(),
         Value::Int { val, .. } => val.into(),
@@ -51,11 +90,11 @@ pub fn nu_to_rmpv(value: Value) -> Result<rmpv::Value, LabeledError> {
             rmpv::Value::Ext(-1, data)
         }
         Value::Range { val, .. } => {
-            let vals: Result<_, _> = val.into_range_iter(None)?.map(nu_to_rmpv).collect();
+            let vals: Result<_, _> = val.into_range_iter(span, None).map(nu_to_rmpv).collect();
             rmpv::Value::Array(vals?)
         }
 
-        Value::CustomValue { val, internal_span } => {
+        Value::Custom { val, internal_span } => {
             let val = val.to_base_value(internal_span)?;
             nu_to_rmpv(val)?
         }

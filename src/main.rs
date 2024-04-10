@@ -1,67 +1,30 @@
-mod from;
-mod into;
-
-use nu_plugin::{serve_plugin, EvaluatedCall, LabeledError, MsgPackSerializer, Plugin};
-use nu_protocol::{Category, PluginSignature, Span, Value};
-use rmpv::decode::read_value_ref;
+use nu_plugin::{serve_plugin, MsgPackSerializer};
+use nu_plugin_msgpack::MsgPackPlugin;
 
 fn main() {
-    serve_plugin(&mut FromMsgpack, MsgPackSerializer {});
-}
+    // When defining your plugin, you can select the Serializer that could be
+    // used to encode and decode the messages. The available options are
+    // MsgPackSerializer and JsonSerializer. Both are defined in the serializer
+    // folder in nu-plugin.
+    serve_plugin(&MsgPackPlugin {}, MsgPackSerializer {})
 
-pub struct FromMsgpack;
-
-const FROM_MSGPACK: &str = "from msgpack";
-const TO_MSGPACK: &str = "to msgpack";
-
-impl Plugin for FromMsgpack {
-    fn signature(&self) -> Vec<nu_protocol::PluginSignature> {
-        vec![
-            PluginSignature::build(FROM_MSGPACK)
-                .usage("Convert from msgpack to structured data.")
-                .category(Category::Formats),
-            PluginSignature::build(TO_MSGPACK)
-                .usage("Converts data into msgpack.")
-                .category(Category::Formats),
-        ]
-    }
-
-    fn run(
-        &mut self,
-        name: &str,
-        _config: &Option<Value>,
-        _call: &EvaluatedCall,
-        input: &Value,
-    ) -> Result<Value, LabeledError> {
-        match name {
-            FROM_MSGPACK => {
-                let mut bin = input.as_binary()?;
-
-                let v = match read_value_ref(&mut bin) {
-                    Err(e) => {
-                        return Err(LabeledError {
-                            label: "Invalid msgpack".into(),
-                            msg: e.to_string(),
-                            span: None,
-                        })
-                    }
-                    Ok(v) => v,
-                };
-
-                from::rmpv_to_nu(v)
-            }
-            TO_MSGPACK => {
-                let msgpack_value = into::nu_to_rmpv(input.clone())?;
-                let mut encoded = vec![];
-                rmpv::encode::write_value(&mut encoded, &msgpack_value)
-                    .expect("encoding to vec can't fail, right?");
-                Ok(Value::binary(encoded, Span::unknown()))
-            }
-            _ => Err(LabeledError {
-                label: "Unknown command".into(),
-                msg: format!("{name:?} is not a command supported by nu_plugin_msgpack"),
-                span: None,
-            }),
-        }
-    }
+    // Note
+    // When creating plugins in other languages one needs to consider how a plugin
+    // is added and used in nushell.
+    // The steps are:
+    // - The plugin is register. In this stage nushell calls the binary file of
+    //      the plugin sending information using the encoded PluginCall::PluginSignature object.
+    //      Use this encoded data in your plugin to design the logic that will return
+    //      the encoded signatures.
+    //      Nushell is expecting and encoded PluginResponse::PluginSignature with all the
+    //      plugin signatures
+    // - When calling the plugin, nushell sends to the binary file the encoded
+    //      PluginCall::CallInfo which has all the call information, such as the
+    //      values of the arguments, the name of the signature called and the input
+    //      from the pipeline.
+    //      Use this data to design your plugin login and to create the value that
+    //      will be sent to nushell
+    //      Nushell expects an encoded PluginResponse::Value from the plugin
+    // - If an error needs to be sent back to nushell, one can encode PluginResponse::Error.
+    //      This is a labeled error that nushell can format for pretty printing
 }

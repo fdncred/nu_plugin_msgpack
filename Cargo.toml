@@ -9,6 +9,6 @@ readme = "README.md"
 
 [dependencies]
 chrono = "0.4.31"
-nu-plugin = "0.90.1"
-nu-protocol = "0.90.1"
+nu-plugin = { version = "0.92.2", path = "../nushell/crates/nu-plugin" }
+nu-protocol = { version = "0.92.2", path = "../nushell/crates/nu-protocol" }
 rmpv = "1.0.1"
