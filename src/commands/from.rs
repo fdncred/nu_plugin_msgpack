@@ -72,7 +72,13 @@ pub fn rmpv_to_nu(value: rmpv::ValueRef<'_>) -> Result<Value, LabeledError> {
             )?;
             Value::string(s, span)
         }
-        rmpv::ValueRef::Binary(b) => Value::binary(b, span),
+        rmpv::ValueRef::Binary(b) => {
+            let mut decompress = Vec::<u8>::new();
+            match brotli::BrotliDecompress(&mut b.as_ref(), &mut decompress) {
+                Ok(_) => Value::string(String::from_utf8_lossy(&decompress), span),
+                Err(_) => Value::binary(b, span),
+            }
+        }
         rmpv::ValueRef::Array(vs) => {
             let vs: Result<_, LabeledError> = vs.into_iter().map(rmpv_to_nu).collect();
             Value::list(vs?, span)
