@@ -1,6 +1,8 @@
 use crate::MsgPackPlugin;
 use nu_plugin::{EngineInterface, EvaluatedCall, SimplePluginCommand};
-use nu_protocol::{Category, LabeledError, Signature, Span, SyntaxShape, Type, Value};
+use nu_protocol::{
+    record, Category, Example, LabeledError, Signature, Span, SyntaxShape, Type, Value,
+};
 
 pub struct ToMsgpack;
 
@@ -17,17 +19,44 @@ impl SimplePluginCommand for ToMsgpack {
     fn signature(&self) -> Signature {
         Signature::build(self.name())
             .named(
-                "compression",
+                "brotli",
                 SyntaxShape::Int,
                 "Brotli Encoder Mode (0 - 11)",
-                Some('c'),
+                Some('b'),
             )
             .category(Category::Formats)
-            .input_output_type(Type::Any, Type::Table(vec![]))
+            .input_output_type(Type::Any, Type::Binary)
     }
 
     fn search_terms(&self) -> Vec<&str> {
         vec!["msgpack", "plugins"]
+    }
+
+    fn examples(&self) -> Vec<Example> {
+        vec![
+            Example {
+                example: "{ greeting: 'hello world' } | to msgpack",
+                description: "Encode msgpack",
+                result: Some(Value::test_binary(b"\x81\xA8\x67\x72\x65\x65\x74\x69\x6E\x67\xAB\x68\x65\x6C\x6C\x6F\x20\x77\x6F\x72\x6C\x64")),
+            },
+            Example {
+                example: "{ greeting: 'hello world this is a long string' } | to msgpack --brotli 9",
+                description: "Encode msgpack and compress strings with brotli (level 9)",
+                result: None,
+            },
+            Example {
+                example: "{ greeting: 'hello world this is a long string' } | to msgpack --brotli 9 | from msgpack --brotli",
+                description: "Encode and decode msgpack with brotli compressed strings",
+                result: Some(Value::test_record(record! {
+                    "greeting" => Value::test_string("hello world this is a long string")
+                })),
+            },
+            Example {
+                example: "{ hello: world } | save helloworld.msgpack",
+                description: "Save msgpack to a file",
+                result: None,
+            }
+        ]
     }
 
     fn run(
@@ -37,11 +66,7 @@ impl SimplePluginCommand for ToMsgpack {
         call: &EvaluatedCall,
         input: &Value,
     ) -> Result<Value, LabeledError> {
-        let compression_param: Option<Value> = call.get_flag("compression")?;
-        let compression = match compression_param {
-            Some(Value::Int { val, .. }) => val as i32,
-            _ => 5, // 5 seemed to be a nice level of compression for the time
-        };
+        let compression: Option<i32> = call.get_flag::<i64>("compression")?.map(|c| c as i32);
         let msgpack_value = nu_to_rmpv(input.clone(), compression)?;
         let mut encoded = vec![];
         rmpv::encode::write_value(&mut encoded, &msgpack_value)
@@ -51,28 +76,32 @@ impl SimplePluginCommand for ToMsgpack {
 }
 
 /// Convert [nu_protocol::Value] to a [rmpv::Value].
-pub fn nu_to_rmpv(value: Value, compression: i32) -> Result<rmpv::Value, LabeledError> {
+pub fn nu_to_rmpv(value: Value, compression: Option<i32>) -> Result<rmpv::Value, LabeledError> {
     let span = value.span();
     Ok(match value {
         Value::Bool { val, .. } => val.into(),
         Value::Int { val, .. } => val.into(),
         Value::Float { val, .. } => val.into(),
         Value::String { val, .. } => {
-            let mut compressed = Vec::<u8>::new();
-            brotli::BrotliCompress(
-                &mut val.as_bytes(),
-                &mut compressed,
-                &brotli::enc::BrotliEncoderParams {
-                    quality: compression,
-                    ..Default::default()
-                },
-            )
-            .map_err(|err| {
-                LabeledError::new(format!("Error {err}"))
-                    .with_label("Error compressing string with Brotli", span)
-            })?;
-            let bin = Value::binary(compressed, span);
-            nu_to_rmpv(bin, compression)?
+            if let Some(compression) = compression {
+                let mut compressed = Vec::<u8>::new();
+                brotli::BrotliCompress(
+                    &mut val.as_bytes(),
+                    &mut compressed,
+                    &brotli::enc::BrotliEncoderParams {
+                        quality: compression,
+                        ..Default::default()
+                    },
+                )
+                .map_err(|err| {
+                    LabeledError::new(format!("Error {err}"))
+                        .with_label("Error compressing string with Brotli", span)
+                })?;
+                let bin = Value::binary(compressed, span);
+                nu_to_rmpv(bin, None)?
+            } else {
+                rmpv::Value::String(val.into())
+            }
         }
         Value::Binary { val, .. } => val.into(),
         Value::Nothing { .. } => rmpv::Value::Nil,
@@ -143,4 +172,10 @@ pub fn nu_to_rmpv(value: Value, compression: i32) -> Result<rmpv::Value, Labeled
         //Value::CellPath { val, .. } => todo!(),
         //Value::MatchPattern { val, .. } => todo!(),
     })
+}
+
+#[test]
+fn test_examples() -> Result<(), nu_protocol::ShellError> {
+    use nu_plugin_test_support::PluginTest;
+    PluginTest::new("msgpack", MsgPackPlugin.into())?.test_command_examples(&ToMsgpack)
 }

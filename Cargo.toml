@@ -13,3 +13,6 @@ chrono = "0.4.31"
 nu-plugin = { version = "0.92.2", path = "../nushell/crates/nu-plugin" }
 nu-protocol = { version = "0.92.2", path = "../nushell/crates/nu-protocol" }
 rmpv = "1.0.1"
+
+[dev-dependencies]
+nu-plugin-test-support = { version = "0.92.2", path = "../nushell/crates/nu-plugin-test-support" }
