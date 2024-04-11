@@ -12,6 +12,6 @@ impl Plugin for MsgPackPlugin {
         // loaded.
         //
         // If it doesn't appear on this list, it won't be added.
-        vec![Box::new(Main), Box::new(FromMsgpack), Box::new(IntoMsgpack)]
+        vec![Box::new(Main), Box::new(FromMsgpack), Box::new(ToMsgpack)]
     }
 }

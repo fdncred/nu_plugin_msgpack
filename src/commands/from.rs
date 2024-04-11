@@ -1,7 +1,7 @@
 use crate::MsgPackPlugin;
-use chrono::NaiveDateTime;
+use chrono::DateTime;
 use nu_plugin::{EngineInterface, EvaluatedCall, SimplePluginCommand};
-use nu_protocol::{Category, LabeledError, Record, Signature, Span, Type, Value};
+use nu_protocol::{record, Category, Example, LabeledError, Record, Signature, Span, Type, Value};
 use rmpv::decode::read_value_ref;
 
 pub struct FromMsgpack;
@@ -16,23 +16,50 @@ impl SimplePluginCommand for FromMsgpack {
     fn usage(&self) -> &str {
         "Convert from msgpack to structured data."
     }
+
     fn signature(&self) -> Signature {
         Signature::build(self.name())
             .category(Category::Formats)
-            .input_output_type(Type::Any, Type::Table(vec![]))
+            .switch("brotli", "Decompress brotli encoded binary data", Some('b'))
+            .input_output_type(Type::Binary, Type::Any)
     }
 
     fn search_terms(&self) -> Vec<&str> {
         vec!["example", "configuration"]
     }
 
+    fn examples(&self) -> Vec<Example> {
+        vec![
+            Example {
+                example: "0x[81A86772656574696E67AB68656C6C6F20776F726C64] | from msgpack",
+                description: "Decode msgpack",
+                result: Some(Value::test_record(record! {
+                    "greeting" => Value::test_string("hello world")
+                })),
+            },
+            Example {
+                example: "0x[81A86772656574696E67C41D1F2000F88D54B5BF64737B2B90B31CA411563A0358CEB1891C642AEE72] | from msgpack --brotli",
+                description: "Decode msgpack with a brotli encoded string",
+                result: Some(Value::test_record(record! {
+                    "greeting" => Value::test_string("hello world this is a long string")
+                })),
+            },
+            Example {
+                example: "open helloworld.msgpack",
+                description: "Load msgpack from a file",
+                result: None,
+            }
+        ]
+    }
+
     fn run(
         &self,
         _plugin: &MsgPackPlugin,
         _engine: &EngineInterface,
-        _call: &EvaluatedCall,
+        call: &EvaluatedCall,
         input: &Value,
     ) -> Result<Value, LabeledError> {
+        let decompress = call.has_flag("brotli")?;
         let mut bin = input.as_binary()?;
 
         let v = match read_value_ref(&mut bin) {
@@ -44,12 +71,12 @@ impl SimplePluginCommand for FromMsgpack {
             Ok(v) => v,
         };
 
-        rmpv_to_nu(v)
+        rmpv_to_nu(v, decompress)
     }
 }
 
 /// Convert [rmpv::Value] to a [nu_protocol::Value].
-pub fn rmpv_to_nu(value: rmpv::ValueRef<'_>) -> Result<Value, LabeledError> {
+pub fn rmpv_to_nu(value: rmpv::ValueRef<'_>, decompress: bool) -> Result<Value, LabeledError> {
     let span = Span::unknown();
     Ok(match value {
         rmpv::ValueRef::Nil => Value::nothing(span),
@@ -73,21 +100,29 @@ pub fn rmpv_to_nu(value: rmpv::ValueRef<'_>) -> Result<Value, LabeledError> {
             Value::string(s, span)
         }
         rmpv::ValueRef::Binary(b) => {
-            let mut decompress = Vec::<u8>::new();
-            match brotli::BrotliDecompress(&mut b.as_ref(), &mut decompress) {
-                Ok(_) => Value::string(String::from_utf8_lossy(&decompress), span),
-                Err(_) => Value::binary(b, span),
+            if decompress {
+                let mut decompressed = Vec::<u8>::new();
+                match brotli::BrotliDecompress(&mut b.as_ref(), &mut decompressed) {
+                    Ok(_) => Value::string(String::from_utf8_lossy(&decompressed), span),
+                    Err(_) => Value::binary(b, span),
+                }
+            } else {
+                Value::binary(b, span)
             }
         }
         rmpv::ValueRef::Array(vs) => {
-            let vs: Result<_, LabeledError> = vs.into_iter().map(rmpv_to_nu).collect();
+            let vs: Result<_, LabeledError> =
+                vs.into_iter().map(|v| rmpv_to_nu(v, decompress)).collect();
             Value::list(vs?, span)
         }
         rmpv::ValueRef::Map(map) => {
             let mut record = Record::new();
 
             for (k, v) in map {
-                record.insert(rmpv_to_nu(k)?.coerce_string()?, rmpv_to_nu(v)?);
+                record.insert(
+                    rmpv_to_nu(k, decompress)?.coerce_string()?,
+                    rmpv_to_nu(v, decompress)?,
+                );
             }
 
             Value::record(record, span)
@@ -148,15 +183,19 @@ fn ext_timestamp_to_nu(data: &[u8]) -> Result<Value, LabeledError> {
         }
     }
 
-    let date = NaiveDateTime::from_timestamp_opt(seconds, nanos)
-        .ok_or_else(|| {
-            LabeledError::new(format!(
-                "Timestamp value (seconds={}, nanos={}) is out of range",
-                seconds, nanos
-            ))
-            .with_label("Timestamp out of range", Span::unknown())
-        })?
-        .and_utc();
+    let date = DateTime::from_timestamp(seconds, nanos).ok_or_else(|| {
+        LabeledError::new(format!(
+            "Timestamp value (seconds={}, nanos={}) is out of range",
+            seconds, nanos
+        ))
+        .with_label("Timestamp out of range", Span::unknown())
+    })?;
 
     Ok(Value::date(date.into(), Span::unknown()))
+}
+
+#[test]
+fn test_examples() -> Result<(), nu_protocol::ShellError> {
+    use nu_plugin_test_support::PluginTest;
+    PluginTest::new("msgpack", MsgPackPlugin.into())?.test_command_examples(&FromMsgpack)
 }
