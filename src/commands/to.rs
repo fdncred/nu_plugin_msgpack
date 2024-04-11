@@ -66,7 +66,7 @@ impl SimplePluginCommand for ToMsgpack {
         call: &EvaluatedCall,
         input: &Value,
     ) -> Result<Value, LabeledError> {
-        let compression: Option<i32> = call.get_flag::<i64>("compression")?.map(|c| c as i32);
+        let compression: Option<i32> = call.get_flag::<i64>("brotli")?.map(|c| c as i32);
         let msgpack_value = nu_to_rmpv(input.clone(), compression)?;
         let mut encoded = vec![];
         rmpv::encode::write_value(&mut encoded, &msgpack_value)
