@@ -2,17 +2,17 @@ use crate::MsgPackPlugin;
 use nu_plugin::{EngineInterface, EvaluatedCall, SimplePluginCommand};
 use nu_protocol::{Category, LabeledError, Signature, Span, SyntaxShape, Type, Value};
 
-pub struct IntoMsgpack;
+pub struct ToMsgpack;
 
-impl SimplePluginCommand for IntoMsgpack {
+impl SimplePluginCommand for ToMsgpack {
     type Plugin = MsgPackPlugin;
 
     fn name(&self) -> &str {
-        "into msgpack"
+        "to msgpack"
     }
 
     fn usage(&self) -> &str {
-        "Converts data into msgpack."
+        "Converts data to msgpack."
     }
     fn signature(&self) -> Signature {
         Signature::build(self.name())
