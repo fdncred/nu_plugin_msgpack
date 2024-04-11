@@ -42,7 +42,7 @@ impl SimplePluginCommand for ToMsgpack {
             Example {
                 example: "{ greeting: 'hello world this is a long string' } | to msgpack --brotli 9",
                 description: "Encode msgpack and compress strings with brotli (level 9)",
-                result: None,
+                result: Some(Value::test_binary(b"\x81\xA8\x67\x72\x65\x65\x74\x69\x6E\x67\xC4\x1E\x1B\x20\x00\x00\xA4\x40\xC2\x60\x22\x07\x0E\x51\xEB\x74\x70\xC8\xC9\xC1\x0E\x49\x4B\x63\xD3\xB1\x3C\x46\xC4\x4B\x4E\x69")),
             },
             Example {
                 example: "{ greeting: 'hello world this is a long string' } | to msgpack --brotli 9 | from msgpack --brotli",
@@ -52,7 +52,7 @@ impl SimplePluginCommand for ToMsgpack {
                 })),
             },
             Example {
-                example: "{ hello: world } | save helloworld.msgpack",
+                example: "{ hello: world } | save --raw helloworld.msgpack",
                 description: "Save msgpack to a file",
                 result: None,
             }
