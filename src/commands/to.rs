@@ -116,8 +116,9 @@ pub fn nu_to_rmpv(value: Value, compression: Option<i32>) -> Result<rmpv::Value,
         // Convert record to map.
         Value::Record { val: record, .. } => {
             let pairs: Result<_, LabeledError> = record
+                .into_owned()
                 .into_iter()
-                .map(|(k, v)| Ok((k.into(), nu_to_rmpv(v, compression)?)))
+                .map(|(k, v)| Ok((k.into(), nu_to_rmpv(v.clone(), compression)?)))
                 .collect();
 
             rmpv::Value::Map(pairs?)

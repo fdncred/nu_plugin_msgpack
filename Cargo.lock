@@ -779,7 +779,7 @@ dependencies = [
 
 [[package]]
 name = "nu-cmd-lang"
-version = "0.92.2"
+version = "0.92.3"
 dependencies = [
  "itertools",
  "nu-engine",
@@ -791,7 +791,7 @@ dependencies = [
 
 [[package]]
 name = "nu-engine"
-version = "0.92.2"
+version = "0.92.3"
 dependencies = [
  "nu-glob",
  "nu-path",
@@ -801,11 +801,11 @@ dependencies = [
 
 [[package]]
 name = "nu-glob"
-version = "0.92.2"
+version = "0.92.3"
 
 [[package]]
 name = "nu-parser"
-version = "0.92.2"
+version = "0.92.3"
 dependencies = [
  "bytesize",
  "chrono",
@@ -820,7 +820,7 @@ dependencies = [
 
 [[package]]
 name = "nu-path"
-version = "0.92.2"
+version = "0.92.3"
 dependencies = [
  "dirs-next",
  "omnipath",
@@ -829,13 +829,14 @@ dependencies = [
 
 [[package]]
 name = "nu-plugin"
-version = "0.92.2"
+version = "0.92.3"
 dependencies = [
  "bincode",
  "log",
  "miette",
  "nu-engine",
  "nu-protocol",
+ "nu-utils",
  "rmp-serde",
  "semver",
  "serde",
@@ -847,7 +848,7 @@ dependencies = [
 
 [[package]]
 name = "nu-plugin-test-support"
-version = "0.92.2"
+version = "0.92.3"
 dependencies = [
  "nu-ansi-term",
  "nu-cmd-lang",
@@ -860,7 +861,7 @@ dependencies = [
 
 [[package]]
 name = "nu-protocol"
-version = "0.92.2"
+version = "0.92.3"
 dependencies = [
  "byte-unit",
  "chrono",
@@ -881,7 +882,7 @@ dependencies = [
 
 [[package]]
 name = "nu-system"
-version = "0.92.2"
+version = "0.92.3"
 dependencies = [
  "chrono",
  "libc",
@@ -898,13 +899,14 @@ dependencies = [
 
 [[package]]
 name = "nu-utils"
-version = "0.92.2"
+version = "0.92.3"
 dependencies = [
  "crossterm_winapi",
  "log",
  "lscolors",
  "nix",
  "num-format",
+ "serde",
  "strip-ansi-escapes",
  "sys-locale",
  "unicase",
